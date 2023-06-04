@@ -1,1 +1,0 @@
-# oklahoma-wind-turbine
