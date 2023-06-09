@@ -55,7 +55,7 @@ class filter_plot_single:
         nch,nt = np.shape(self.strain_data)
         self.nch = nch
         self.nt = nt
-        self.time = np.linspace(0,self.nt/1000,self.nt)
+        self.time = np.linspace(0,self.nt/100,self.nt)
         self.dt = self.time[1] - self.time[0]
         self.psd = None
         self.freqs = None
@@ -142,14 +142,17 @@ class filter_plot_single:
         self.channels = channels
         return self.filtered_data_all
 
-    def iso_view_plot(self,channels):
+    def iso_view_plot(self,channels,time_start,time_end):
+        # "
+        # % Time is in 
+        # "
         fig = plt.figure(figsize=(10,8))
         ax = fig.add_subplot(111,projection='3d')
 
         # Plot each spatial point time series
         for i in channels:
             zs = np.ones_like(self.time)*i
-            ax.plot(self.time,zs,self.filtered_data_all[i],color=u'#1f77b4',alpha=0.8)
+            ax.plot(self.time[time_start:time_end],zs[time_start:time_end],self.filtered_data_all[i][time_start:time_end],color=u'#1f77b4',alpha=0.8)
 
 
         ax.set_xlabel('Time')
