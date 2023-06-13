@@ -17,7 +17,7 @@ def decim_to_100(directory_to_file,name_of_file):
     nch, _ = raw_data.shape
 
     # Decimate
-    decim_factor = 10  # 1,000 Hz -> 100 Hz
+    decim_factor = 50  # 5,000 Hz -> 100 Hz
     # Get length of decimated vector
     decim_length = len(decimate(raw_data[0,:], decim_factor))
     # Initialize phase_decim array
@@ -32,7 +32,7 @@ def decim_to_100(directory_to_file,name_of_file):
 
     # Convert to strain
     Lambd = 1550e-9
-    Lgauge = 2.041905*4
+    Lgauge = 8.167619
     n_FRI = 1.468200
     PSF = 0.78
 
@@ -44,8 +44,8 @@ def decim_to_100(directory_to_file,name_of_file):
 
 def load_decim_data(directory_of_file):
     file = h5py.File(directory_of_file+'.h5', 'r')
-    data = file['/Acquisition/Raw[0]/RawData']
-    # data = file[directory_of_file]
+    # data = file['/Acquisition/Raw[0]/RawData']
+    data = file[directory_of_file]
     # convert h5 group to double
     return np.double(data)
 
@@ -90,9 +90,10 @@ class filter_plot_single:
         plt.legend()
         plt.show
 
-    def plot_filtered(self):
+    def plot_filtered(self,time_start,time_end,freq=5000):
         plt.figure(figsize=(10,6))
-        plt.plot(self.time,self.filtered_data,label='Filtered Data')
+        plt.plot(self.time[time_start:time_end],self.filtered_data[time_start:time_end],label='Filtered Data')
+        
         plt.xlabel('Time (s)')
         plt.ylabel('Strain (microstrain)')
         plt.title('Butterworth Band Filtered')
@@ -132,8 +133,8 @@ class filter_plot_single:
         plt.tight_layout()
         plt.show()
 
-    def butter_all(self,channels,order=2,cutoff_freq=0.05):
-        nyquist_freq = 0.5 * 100
+    def butter_all(self,channels,order=2,cutoff_freq=0.05,freq = 5000):
+        nyquist_freq = 0.5 * freq
         normal_cutoff = cutoff_freq / nyquist_freq
 
         b,a = butter(order, normal_cutoff, btype='high')
@@ -152,7 +153,7 @@ class filter_plot_single:
 
         # Plot each spatial point time series
         for i in channels:
-            zs = np.ones_like(self.time)*i
+            zs = np.ones_like(self.time)*i*8.167619
             ax.plot(self.time[time_start:time_end],zs[time_start:time_end],self.filtered_data_all[i][time_start:time_end],color=u'#1f77b4',alpha=0.8)
 
 
@@ -161,7 +162,7 @@ class filter_plot_single:
         ax.set_zlabel('Data Value')
         ax.set_title('3D Line Plots for Time Series at Each Spatial Point')
         ax.set_box_aspect([6, 4, 1])
-        ax.view_init(20, 35)  # (elevation, azimuth)
+        ax.view_init(25, 35)  # (elevation, azimuth)
         plt.show()
 
     def iso_view_scatter(self,channels,time_start,time_end):
@@ -175,7 +176,7 @@ class filter_plot_single:
 
         # Plot each spatial point time series
         for i in channels:
-            zs = np.ones_like(self.time)*i
+            zs = np.ones_like(self.time)*i*8.167619
             sc = ax.scatter(self.time[time_start:time_end],zs[time_start:time_end],self.filtered_data_all[i][time_start:time_end],c=self.filtered_data_all[i][time_start:time_end],cmap=cmap,alpha=0.8)
 
         fig.colorbar(sc, ax=ax)
