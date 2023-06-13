@@ -32,7 +32,7 @@ def decim_to_100(directory_to_file,name_of_file):
 
     # Convert to strain
     Lambd = 1550e-9
-    Lgauge = 2.041905
+    Lgauge = 2.041905*4
     n_FRI = 1.468200
     PSF = 0.78
 
@@ -44,18 +44,19 @@ def decim_to_100(directory_to_file,name_of_file):
 
 def load_decim_data(directory_of_file):
     file = h5py.File(directory_of_file+'.h5', 'r')
-    data = file[directory_of_file]
+    data = file['/Acquisition/Raw[0]/RawData']
+    # data = file[directory_of_file]
     # convert h5 group to double
     return np.double(data)
 
 class filter_plot_single:
     def __init__(self,strain_data):
-        self.strain_data = strain_data
+        self.strain_data = strain_data.T
         ## Get properties of strain_data
         nch,nt = np.shape(self.strain_data)
         self.nch = nch
         self.nt = nt
-        self.time = np.linspace(0,self.nt/100,self.nt)
+        self.time = np.linspace(0,self.nt/1000,self.nt)
         self.dt = self.time[1] - self.time[0]
         self.psd = None
         self.freqs = None
@@ -155,6 +156,29 @@ class filter_plot_single:
             ax.plot(self.time[time_start:time_end],zs[time_start:time_end],self.filtered_data_all[i][time_start:time_end],color=u'#1f77b4',alpha=0.8)
 
 
+        ax.set_xlabel('Time')
+        ax.set_ylabel('Channel')
+        ax.set_zlabel('Data Value')
+        ax.set_title('3D Line Plots for Time Series at Each Spatial Point')
+        ax.set_box_aspect([6, 4, 1])
+        ax.view_init(20, 35)  # (elevation, azimuth)
+        plt.show()
+
+    def iso_view_scatter(self,channels,time_start,time_end):
+        # "
+        # % Time is in 
+        # "
+        cmap = plt.get_cmap('RdYlGn')
+        fig = plt.figure(figsize=(10,8))
+        ax = fig.add_subplot(111,projection='3d')
+        
+
+        # Plot each spatial point time series
+        for i in channels:
+            zs = np.ones_like(self.time)*i
+            sc = ax.scatter(self.time[time_start:time_end],zs[time_start:time_end],self.filtered_data_all[i][time_start:time_end],c=self.filtered_data_all[i][time_start:time_end],cmap=cmap,alpha=0.8)
+
+        fig.colorbar(sc, ax=ax)
         ax.set_xlabel('Time')
         ax.set_ylabel('Channel')
         ax.set_zlabel('Data Value')
