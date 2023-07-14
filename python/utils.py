@@ -5,6 +5,12 @@ from scipy.signal import butter
 from scipy.signal import filtfilt
 import matplotlib.pyplot as plt
 
+
+
+
+
+
+
 def decim_to_100(directory_to_file,name_of_file):
 
     # Open the HDF5 file
@@ -48,6 +54,8 @@ def load_decim_data(directory_of_file):
     data = file[directory_of_file]
     # convert h5 group to double
     return np.double(data)
+
+
 
 class filter_plot_single:
     def __init__(self,strain_data):
