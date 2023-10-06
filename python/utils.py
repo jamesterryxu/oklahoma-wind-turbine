@@ -4,14 +4,11 @@ from scipy.signal import decimate
 from scipy.signal import butter
 from scipy.signal import filtfilt
 import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+import datetime
 
 
-
-
-
-
-
-def decim_to_100(directory_to_file,name_of_file):
+def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
 
     # Open the HDF5 file
     file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r')
@@ -23,11 +20,12 @@ def decim_to_100(directory_to_file,name_of_file):
     nch, _ = raw_data.shape
 
     # Decimate
-    decim_factor = 50  # 5,000 Hz -> 100 Hz
     # Get length of decimated vector
     decim_length = len(decimate(raw_data[0,:], decim_factor))
     # Initialize phase_decim array
-    raw_decim = np.zeros((nch, decim_length))
+    # Use empty to make sure that we don't impute values
+    raw_decim = np.empty((nch, decim_length))
+    time_decim = np.empty((decim_length))
 
     # Decimate each channel time series 
     for i in range(nch): # range(nch)
@@ -46,14 +44,18 @@ def decim_to_100(directory_to_file,name_of_file):
 
     # Save decimated strain data
     with h5py.File(directory_to_file+'/'+name_of_file+'_decimated100hz'+'.h5', 'w') as hf:
-        hf.create_dataset(directory_to_file+'/'+name_of_file+'_decimated100hz',  data=strain_decim)
+        hf.create_dataset('strain',  data=strain_decim)
+        hf.create_dataset('time',data=time_decim)
+        hf.close()
 
-def load_decim_data(directory_of_file):
-    file = h5py.File(directory_of_file+'.h5', 'r')
-    # data = file['/Acquisition/Raw[0]/RawData']
-    data = file[directory_of_file]
+def load_decim_data(directory_to_file,name_of_file):
+    file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r+')
+    data = file['strain']
+    time = file['time']
+    # Convert decimated time data to datetime
+    time_datetime = [datetime.datetime.fromtimestamp(i/1000000) for i in time]
     # convert h5 group to double
-    return np.double(data)
+    return np.double(data),time_datetime
 
 
 
