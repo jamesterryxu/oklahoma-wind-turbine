@@ -16,9 +16,9 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
         decim_factor: factor to decimate
 
     Returns:
+        Saves a decimated .h5 file, with time and strain
 
     Raises:
-
     '''
     # Open the HDF5 file
     file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r')
@@ -61,6 +61,18 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
         hf.close()
 
 def load_decim_data(directory_to_file,name_of_file):
+    ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
+    Args:
+        directory_to_file: full directory to file (string)
+        name_of_file: .h5 file that you want to decimate (string)
+        decim_factor: factor to decimate
+
+    Returns:
+        strain_data: numpy double of strain data
+        time: list of datetimes
+
+    Raises:
+    '''
     file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r+')
     data = file['strain']
     time = file['time']
