@@ -6,9 +6,9 @@ from scipy.signal import filtfilt
 import matplotlib.pyplot as plt
 import matplotlib.ticker as ticker
 import datetime
+import os
 
-
-def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
+def decim_to_100(directory_to_file,name_of_file,gauge_length,decim_factor=50):
     ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
     Args:
         directory_to_file: full directory to file (string)
@@ -28,8 +28,11 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     # Transpose data
     raw_data = raw_data.T
     nch, _ = raw_data.shape
+    # Import time
+    raw_time = np.double(file['/Acquisition/Raw[0]/RawDataTime'])
 
     # Decimate
+    # 100,000 Hz -> 100 Hz, decim_factor = 1000
     # Get length of decimated vector
     decim_length = len(decimate(raw_data[0,:], decim_factor))
     # Initialize phase_decim array
@@ -37,23 +40,38 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     raw_decim = np.empty((nch, decim_length))
     time_decim = np.empty((decim_length))
 
+    # decim
     # Decimate each channel time series 
     for i in range(nch): # range(nch)
         raw_decim[i, :] = decimate(raw_data[i,:], decim_factor)
 
-    
+    # Decimate TIME data DON'T use decimate function! The decimate function downsamples the signal
+    # after applying an anti-aliasing filter! Just take every decim_factor (1000th) entry
+    time_decim = raw_time[0::decim_factor]
+
+    # Check if it is actually 100 Hz
+    time_difference = time_decim[1] - time_decim[0]
+    if (time_difference - 10000) < 1e-3: # datetime format here, 10000 is 0.01 seconds, unix format
+        pass
+    else:
+        print(time_difference -10000)
+        raise ValueError
+
     # Convert raw_data to phase_data
     phase_decim = raw_decim / 10430.378350470453
 
     # Convert to strain
     ### Does this change with different channel readouts? CHECK!
-    Lambd = 1550e-9
-    Lgauge = 8.167619
-    n_FRI = 1.468200
-    PSF = 0.78
+    Lambd = 1550e-9 # wavelength for Rayleigh incident light, 1550 nm
+    if gauge_length == 1:
+        Lgauge = 8.167619
+    else:
+        Lgauge = 1.0209523
+    n_FRI = 1.468200 # fiber refractive index
+    PSF = 0.78 # photoelastic scaling factor xi
 
     strain_decim = (Lambd / (4*np.pi*n_FRI*Lgauge*PSF)) * phase_decim * 1e6 # microstrain
-
+    
     # Save decimated strain data
     with h5py.File(directory_to_file+'/'+name_of_file+'_decimated100hz'+'.h5', 'w') as hf:
         hf.create_dataset('strain',  data=strain_decim)
@@ -61,7 +79,7 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
         hf.close()
 
 def load_decim_data(directory_to_file,name_of_file):
-    ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
+    ''' Function to load decimated 100 Hz and process the datetimes
     Args:
         directory_to_file: full directory to file (string)
         name_of_file: .h5 file that you want to decimate (string)
@@ -81,7 +99,65 @@ def load_decim_data(directory_to_file,name_of_file):
     # convert h5 group to double
     return np.double(data),time_datetime
 
+def sort_filenames_by_time(filenames):
+    ''' Helper function to sort filenames
+    '''
+    return sorted(filenames, key=lambda x: datetime.datetime.strptime(x.split('_')[1], "%Y-%m-%dT%H%M%S%z"))
 
+def load_decim_data_helper(directory_to_file,name_of_file):
+    ''' Helper function to load decimated 100 Hz
+    Args:
+        directory_to_file: full directory to file (string)
+        name_of_file: .h5 file that you want to decimate (string)
+        decim_factor: factor to decimate
+
+    Returns:
+        strain_data: 
+        time: 
+
+    Raises:
+    '''
+    file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r+')
+    data = file['strain']
+    time = file['time']
+    return data,time
+
+
+def concatenate_and_save_h5(directory_to_file, output_filename):
+    files = [f for f in os.listdir(directory_to_file) if f.endswith('_decimated100hz.h5')]
+    sorted_files = sort_filenames_by_time(files)
+
+    # Read the first file to determine the shape of the data
+    first_strain, _ = load_decim_data_helper(directory_to_file, sorted_files[0].replace('.h5', ''))
+    num_spatial_points, _ = first_strain.shape
+
+    # Initialize the arrays based on the shape of the first file
+    all_strain_data = np.empty((num_spatial_points, 0))
+    all_time_data = np.empty((0,))  # Assuming time data is 1D
+
+    for file in sorted_files:
+        print(file)
+        strain_data, time_data = load_decim_data_helper(directory_to_file, file.replace('.h5', ''))
+        print(np.shape(strain_data))
+        all_strain_data = np.append(all_strain_data, strain_data, axis=1)
+        all_time_data = np.append(all_time_data, time_data)  # Assuming time data is 1D
+
+    
+    print(np.shape(all_strain_data))
+    print(np.shape(all_time_data))
+
+    # all_strain_data = np.concatenate(all_strain_data, axis=0)
+
+    # # convert time data back to original format
+    # all_time_data_int = [int(t.timestamp() * 1000000) for t in all_time_data]
+
+    # # Save data into a new h5 file
+    # with h5py.File(directory_to_file+'/'+output_filename+'.h5', 'w') as f:
+    #     f.create_dataset('strain', data=all_strain_data)
+    #     f.create_dataset('time', data=all_time_data_int)
+
+
+### Classes
 
 class filter_plot_single:
     def __init__(self,strain_data):
