@@ -8,7 +8,7 @@ import matplotlib.ticker as ticker
 import datetime
 import os
 
-def decim_to_100(directory_to_file,name_of_file,gauge_length,decim_factor=50):
+def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
     Args:
         directory_to_file: full directory to file (string)
@@ -63,9 +63,11 @@ def decim_to_100(directory_to_file,name_of_file,gauge_length,decim_factor=50):
     # Convert to strain
     ### Does this change with different channel readouts? CHECK!
     Lambd = 1550e-9 # wavelength for Rayleigh incident light, 1550 nm
-    if gauge_length == 1:
+    if nch == 102:
+        print(8)
         Lgauge = 8.167619
     else:
+        print(1)
         Lgauge = 1.0209523
     n_FRI = 1.468200 # fiber refractive index
     PSF = 0.78 # photoelastic scaling factor xi
@@ -77,6 +79,29 @@ def decim_to_100(directory_to_file,name_of_file,gauge_length,decim_factor=50):
         hf.create_dataset('strain',  data=strain_decim)
         hf.create_dataset('time',data=time_decim)
         hf.close()
+
+def batch_decim_to_100(directory):
+    ''' Decimate all .h5 files in the specified directory.
+    Args:
+        directory: The path to the directory containing the .h5 files.
+
+    Returns:
+        None. Decimated files are saved in the same directory with the '_decimated100hz' suffix.
+    '''
+    # List all files in the directory
+    files = os.listdir(directory)
+
+    # Filter only .h5 files which do not contain 'decimated' in their filename
+    h5_files = [f for f in files if f.endswith('.h5') and 'decimated' not in f]
+
+    # Decimate each of these files
+    for file in h5_files:
+        print(f"Decimating {file}")
+        # Extract the file name without the extension
+        name_without_ext = os.path.splitext(file)[0]
+        decim_to_100(directory, name_without_ext)
+        print(f"{file} decimated")
+
 
 def load_decim_data(directory_to_file,name_of_file):
     ''' Function to load decimated 100 Hz and process the datetimes
@@ -124,6 +149,8 @@ def load_decim_data_helper(directory_to_file,name_of_file):
 
 
 def concatenate_and_save_h5(directory_to_file, output_filename):
+    ''' Function to compile the decimated files
+    '''
     files = [f for f in os.listdir(directory_to_file) if f.endswith('_decimated100hz.h5')]
     sorted_files = sort_filenames_by_time(files)
 
@@ -138,23 +165,19 @@ def concatenate_and_save_h5(directory_to_file, output_filename):
     for file in sorted_files:
         print(file)
         strain_data, time_data = load_decim_data_helper(directory_to_file, file.replace('.h5', ''))
-        print(np.shape(strain_data))
         all_strain_data = np.append(all_strain_data, strain_data, axis=1)
         all_time_data = np.append(all_time_data, time_data)  # Assuming time data is 1D
 
-    
-    print(np.shape(all_strain_data))
-    print(np.shape(all_time_data))
+    # print(np.shape(all_strain_data))
+    # print(np.shape(all_time_data))
 
-    # all_strain_data = np.concatenate(all_strain_data, axis=0)
+    # Get correct file name to save, get the first datetime of the filenames
+    filename = '_'.join(sorted_files[0].split('_')[:2])
 
-    # # convert time data back to original format
-    # all_time_data_int = [int(t.timestamp() * 1000000) for t in all_time_data]
-
-    # # Save data into a new h5 file
-    # with h5py.File(directory_to_file+'/'+output_filename+'.h5', 'w') as f:
-    #     f.create_dataset('strain', data=all_strain_data)
-    #     f.create_dataset('time', data=all_time_data_int)
+    # Save data into a new h5 file
+    with h5py.File(directory_to_file+'/'+filename+output_filename+'.h5', 'w') as f:
+        f.create_dataset('strain', data=all_strain_data)
+        f.create_dataset('time', data=all_time_data)
 
 
 ### Classes
