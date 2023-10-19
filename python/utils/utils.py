@@ -63,12 +63,13 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     # Convert to strain
     ### Does this change with different channel readouts? CHECK!
     Lambd = 1550e-9 # wavelength for Rayleigh incident light, 1550 nm
-    if nch == 102:
-        print(8)
-        Lgauge = 8.167619
-    else:
-        print(1)
-        Lgauge = 1.0209523
+    # if nch == 102:
+    #     print(8)
+    #     Lgauge = 8.167619
+    # else:
+    #     print(1)
+    #     Lgauge = 1.0209523
+    Lgauge = 8.167619
     n_FRI = 1.468200 # fiber refractive index
     PSF = 0.78 # photoelastic scaling factor xi
 
