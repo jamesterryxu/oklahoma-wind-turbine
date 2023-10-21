@@ -8,6 +8,15 @@ import matplotlib.ticker as ticker
 import datetime
 import os
 
+def reformat(directory_to_file,name_of_file):
+    ''' Function to reformat the data fields in the h5 file
+    Args:
+
+    Returns:
+
+    Raises:
+    '''
+
 def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
     Args:
@@ -31,19 +40,25 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     # Import time
     raw_time = np.double(file['/Acquisition/Raw[0]/RawDataTime'])
 
+    # Convert raw_data to phase_data
+    phase_data = raw_data / 10430.378350470453 # This is (2**15)/pi
+
+    # UNWRAP PHASE_DECIM (RADIAN NUMBER) BEFORE DECIMATION 
+    phase_data_unwrapped = np.unwrap(phase_data,axis=1) # axis on time dimension
+
     # Decimate
     # 100,000 Hz -> 100 Hz, decim_factor = 1000
     # Get length of decimated vector
-    decim_length = len(decimate(raw_data[0,:], decim_factor))
+    decim_length = len(decimate(phase_data_unwrapped[0,:], decim_factor))
     # Initialize phase_decim array
     # Use empty to make sure that we don't impute values
-    raw_decim = np.empty((nch, decim_length))
+    phase_data_unwrapped_decim = np.empty((nch, decim_length))
     time_decim = np.empty((decim_length))
 
     # decim
     # Decimate each channel time series 
     for i in range(nch): # range(nch)
-        raw_decim[i, :] = decimate(raw_data[i,:], decim_factor)
+        phase_data_unwrapped_decim[i, :] = decimate(raw_data[i,:], decim_factor)
 
     # Decimate TIME data DON'T use decimate function! The decimate function downsamples the signal
     # after applying an anti-aliasing filter! Just take every decim_factor (1000th) entry
@@ -56,10 +71,7 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     else:
         print(time_difference -10000)
         raise ValueError
-
-    # Convert raw_data to phase_data
-    phase_decim = raw_decim / 10430.378350470453
-
+    
     # Convert to strain
     ### Does this change with different channel readouts? CHECK!
     Lambd = 1550e-9 # wavelength for Rayleigh incident light, 1550 nm
@@ -73,7 +85,7 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     n_FRI = 1.468200 # fiber refractive index
     PSF = 0.78 # photoelastic scaling factor xi
 
-    strain_decim = (Lambd / (4*np.pi*n_FRI*Lgauge*PSF)) * phase_decim * 1e6 # microstrain
+    strain_decim = (Lambd / (4*np.pi*n_FRI*Lgauge*PSF)) * phase_data_unwrapped_decim * 1e6 # microstrain
     
     # Save decimated strain data
     with h5py.File(directory_to_file+'/'+name_of_file+'_decimated100hz'+'.h5', 'w') as hf:
