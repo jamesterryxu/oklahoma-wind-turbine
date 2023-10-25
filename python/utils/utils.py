@@ -8,14 +8,34 @@ import matplotlib.ticker as ticker
 import datetime
 import os
 
-def reformat(directory_to_file,name_of_file):
-    ''' Function to reformat the data fields in the h5 file
+def raw_to_phase(directory_to_file,name_of_file):
+    ''' Function to reformat the data fields in the h5 file (Doesn't decimate or unwrap)
     Args:
-
+        directory_to_file: full directory to file (string)
+        name_of_file: .h5 file that you want to decimate (string)
     Returns:
 
     Raises:
     '''
+    # Open the HDF5 file
+    file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r')
+    # Read the dataset
+    raw_data = file['/Acquisition/Raw[0]/RawData']
+    raw_data = np.double(raw_data) # Convert to double
+    # Transpose data
+    raw_data = raw_data.T
+    nch, _ = raw_data.shape
+    # Import time
+    raw_time = np.double(file['/Acquisition/Raw[0]/RawDataTime'])
+
+    # Convert raw_data to phase_data
+    phase_data = raw_data / 10430.378350470453 # This is (2**15)/pi
+    
+    # Save decimated strain data
+    with h5py.File(directory_to_file+'/'+name_of_file+'_phase'+'.h5', 'w') as hf:
+        hf.create_dataset('phase',  data=phase_data)
+        hf.create_dataset('time',data=raw_time)
+        hf.close()
 
 def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
     ''' Function to decimate the raw files into 100 Hz, and convert phase data to microstrain data
@@ -93,6 +113,28 @@ def decim_to_100(directory_to_file,name_of_file,decim_factor=50):
         hf.create_dataset('time',data=time_decim)
         hf.close()
 
+def batch_raw_to_phase(directory):
+    ''' Convert to phase data of all .h5 files in the specified directory.
+    Args:
+        directory: The path to the directory containing the .h5 files.
+
+    Returns:
+        None. Phase files are saved in the same directory with the '_phase' suffix.
+    '''
+    # List all files in the directory
+    files = os.listdir(directory)
+
+    # Filter only .h5 files which do not contain 'phase' or 'decimated' in their filename
+    h5_files = [f for f in files if f.endswith('.h5') and 'phase' not in f and 'decimated' not in f]
+
+    # Decimate each of these files
+    for file in h5_files:
+        print(f"Converting {file} to phase data")
+        # Extract the file name without the extension
+        name_without_ext = os.path.splitext(file)[0]
+        raw_to_phase(directory, name_without_ext)
+        print(f"{file} done")
+
 def batch_decim_to_100(directory):
     ''' Decimate all .h5 files in the specified directory.
     Args:
@@ -115,13 +157,31 @@ def batch_decim_to_100(directory):
         decim_to_100(directory, name_without_ext)
         print(f"{file} decimated")
 
+def load_phase_data(directory_to_file,name_of_file):
+    ''' Function to load decimated 100 Hz and process the datetimes
+    Args:
+        directory_to_file: full directory to file (string)
+        name_of_file: .h5 file that you want to decimate (string)
+
+    Returns:
+        phase_data: numpy double of strain data
+        time: list of datetimes
+
+    Raises:
+    '''
+    file = h5py.File(directory_to_file+'/'+name_of_file+'.h5', 'r+')
+    data = file['phase']
+    time = file['time']
+    # Convert decimated time data to datetime
+    time_datetime = [datetime.datetime.fromtimestamp(i/1000000) for i in time]
+    # convert h5 group to double
+    return np.double(data),time_datetime
 
 def load_decim_data(directory_to_file,name_of_file):
     ''' Function to load decimated 100 Hz and process the datetimes
     Args:
         directory_to_file: full directory to file (string)
         name_of_file: .h5 file that you want to decimate (string)
-        decim_factor: factor to decimate
 
     Returns:
         strain_data: numpy double of strain data
@@ -161,7 +221,7 @@ def load_decim_data_helper(directory_to_file,name_of_file):
     return data,time
 
 
-def concatenate_and_save_h5(directory_to_file, output_filename):
+def concatenate_and_save_h5(directory_to_file, output_filename, filetype):
     ''' Function to compile the decimated files
     '''
     files = [f for f in os.listdir(directory_to_file) if f.endswith('_decimated100hz.h5')]
